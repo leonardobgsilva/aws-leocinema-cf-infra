@@ -1,0 +1,175 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+#/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/#
+
+Parameters:
+  VPCCIDR:
+    Description: CIDR para a VPC
+    Type: String
+
+  PublicSubnetCIDR:
+    Description: CIDR para a Subnet
+    Type: String
+
+  PublicSubnetAZ:
+    Description: Availabilty Zone para a Subnet
+    Type: String
+
+  AMIId:
+    Description: ID da AMI para a EC2
+    Type: AWS::EC2::Image::Id
+    Default: ami-08a0d1e16fc3f61ea
+
+  KeyPair:
+    Description: Key Pair para se conectar na EC2
+    Type: String
+
+  InstanceType:
+    Description: Tipo da instância para a EC2
+    Type: String
+
+  TagProjeto:
+    Description: Nome do projeto 
+    Type: String
+
+  TagGerenciado:
+    Description: Como os recursos são provisionados
+    Type: String
+
+#/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/#
+
+Resources:
+
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: 'Name'
+          Value: "vpc-leocinema-cf"
+        - Key: 'Projeto'
+          Value: !Ref TagProjeto
+        - Key: 'Gerenciado Por'
+          Value: !Ref TagGerenciado
+
+  PublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCIDR
+      MapPublicIpOnLaunch: 'true'
+      AvailabilityZone: !Ref PublicSubnetAZ
+      Tags:
+        - Key: 'Name'
+          Value: "public-subnet-leocinema-cf"
+        - Key: 'Projeto'
+          Value: !Ref TagProjeto
+        - Key: 'Gerenciado Por'
+          Value: !Ref TagGerenciado
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: 'Name'
+          Value: "igw-leocinema-cf"
+        - Key: 'Projeto'
+          Value: !Ref TagProjeto
+        - Key: 'Gerenciado Por'
+          Value: !Ref TagGerenciado
+
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: "rt-leocinema-cf"
+        - Key: 'Projeto'
+          Value: !Ref TagProjeto
+        - Key: 'Gerenciado Por'
+          Value: !Ref TagGerenciado
+
+  Route:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPair
+      ImageId: !Ref AMIId
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnet
+          GroupSet:
+            - !Ref SecurityGroup
+
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install -y git
+          sudo yum install -y nodejs npm
+          git clone https://github.com/leonardobgsilva/app-leocinema-lite.git
+          cd app-leocinema-lite
+          sudo npm install
+          sudo npm start
+
+      BlockDeviceMappings:
+      - DeviceName: "/dev/xvda"
+        Ebs:
+          VolumeType: gp2
+          VolumeSize: "8"
+          DeleteOnTermination: "true"
+
+      Tags:
+        - Key: 'Name'
+          Value: "ec2-leocinema-lite-cf"
+        - Key: 'Projeto'
+          Value: !Ref TagProjeto
+        - Key: 'Gerenciado Por'
+          Value: !Ref TagGerenciado
+          
+  SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Acesso habilitado para SSH e HTTP'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: 'tcp'
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: 'Name'
+          Value: "sg-leocinema-cf"
+        - Key: 'Projeto'
+          Value: !Ref TagProjeto
+        - Key: 'Gerenciado Por'
+          Value: !Ref TagGerenciado

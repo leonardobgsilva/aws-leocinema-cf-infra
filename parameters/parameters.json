@@ -1,0 +1,30 @@
+[
+    {
+        "ParameterKey": "VPCCIDR",
+        "ParameterValue": "10.0.0.0/16"
+    },
+    {
+        "ParameterKey": "PublicSubnetCIDR",
+        "ParameterValue": "10.0.1.0/24"
+    },
+    {
+        "ParameterKey": "PublicSubnetAZ",
+        "ParameterValue": "us-east-1a"
+    },
+    {
+        "ParameterKey": "KeyPair",
+        "ParameterValue": "ec2-leocinema-cf"
+    },
+    {
+        "ParameterKey": "InstanceType",
+        "ParameterValue": "t2.micro"
+    },
+    {
+        "ParameterKey": "TagProjeto",
+        "ParameterValue": "Aplicação LeoCinema Lite"
+    },
+    {
+        "ParameterKey": "TagGerenciado",
+        "ParameterValue": "CloudFormation"
+    }
+]
