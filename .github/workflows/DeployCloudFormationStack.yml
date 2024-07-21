@@ -33,7 +33,7 @@ jobs:
     - name: Check if stack exists
       id: stack_check
       run: |
-        if aws cloudformation describe-stacks --stack-name $STACK_NAME; then
+        if aws cloudformation describe-stacks --stack-name $STACK_NAME > /dev/null 2>&1; then
           echo "stack_exists=true" >> $GITHUB_ENV
         else
           echo "stack_exists=false" >> $GITHUB_ENV
@@ -41,7 +41,7 @@ jobs:
 
     - name: Deploy CloudFormation stack
       run: |
-        if [ "$stack_exists" == "true" ]; then
+        if [ "${{ env.stack_exists }}" == "true" ]; then
           echo "Updating stack..."
           aws cloudformation update-stack --stack-name $STACK_NAME --template-body file://$TEMPLATE_FILE --parameters file://$PARAMETER_FILE --capabilities CAPABILITY_AUTO_EXPAND
         else
