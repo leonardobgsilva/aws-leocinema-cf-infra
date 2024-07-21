@@ -1,0 +1,58 @@
+name: Deploy CloudFormation Stack
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1
+      STACK_NAME: aws-leocinema-cf-infra
+      TEMPLATE_FILE: aws-leocinema-cf-infra.yaml
+      PARAMETER_FILE: parameters/parameters.json
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        role-to-assume: ${{ secrets.AWS_ASSUME_ROLE }}
+
+    - name: Check if stack exists
+      id: stack_check
+      run: |
+        if aws cloudformation describe-stacks --stack-name $STACK_NAME; then
+          echo "stack_exists=true" >> $GITHUB_ENV
+        else
+          echo "stack_exists=false" >> $GITHUB_ENV
+        fi
+
+    - name: Deploy CloudFormation stack
+      run: |
+        if [ "$stack_exists" == "true" ]; then
+          echo "Updating stack..."
+          aws cloudformation update-stack --stack-name $STACK_NAME --template-body file://$TEMPLATE_FILE --parameters file://$PARAMETER_FILE --capabilities CAPABILITY_AUTO_EXPAND
+        else
+          echo "Creating stack..."
+          aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://$TEMPLATE_FILE --parameters file://$PARAMETER_FILE --capabilities CAPABILITY_AUTO_EXPAND
+        fi
+        aws cloudformation wait stack-update-complete --stack-name $STACK_NAME || \
+        aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+
+    - name: Handle stack failure
+      if: failure()
+      run: |
+        echo "Stack operation failed. Fetching error logs..."
+        aws cloudformation describe-stack-events --stack-name $STACK_NAME --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].{Status:ResourceStatus,Reason:ResourceStatusReason,Resource:LogicalResourceId}' --output table
+        aws cloudformation delete-stack --stack-name $STACK_NAME
+        aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+        exit 1
